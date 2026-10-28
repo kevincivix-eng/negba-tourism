@@ -881,6 +881,26 @@ function modal(html){
   document.body.appendChild(bg); bg.addEventListener('mousedown', e => { if (e.target === bg) bg.remove(); });
   return bg;
 }
+// Confirmation step for actions that touch several businesses at once
+function confirmMany(ids, title, okLabel, okClass){
+  ids = [...ids];
+  const names = ids.slice(0, 8).map(id => RIDX[id] && RIDX[id][NAME]).filter(Boolean);
+  const mix = {yes:0, maybe:0, no:0, none:0}; ids.forEach(id => mix[status(id)]++);
+  const now = ['yes','maybe','no','none'].filter(k => mix[k]).map(k => `${mix[k]} ${k === 'none' ? NONE_LABEL : S_LABEL[k]}`).join(' · ');
+  return new Promise(resolve => {
+    const bg = modal(`<h3>${esc(title)}</h3>
+      <p style="margin:0 0 8px">הפעולה תחול על <b>${ids.length} עסקים</b> ותעודכן אצל כל המשתמשים.</p>
+      <p style="margin:0 0 8px;color:var(--muted);font-size:13px">הסטטוס שלהם כרגע: ${now}</p>
+      <ul style="margin:0 0 14px;padding-inline-start:18px;color:var(--muted);font-size:13px">${names.map(n => `<li>${esc(n)}</li>`).join('')}${ids.length > names.length ? `<li>ועוד ${ids.length - names.length}…</li>` : ''}</ul>
+      <div style="display:flex;gap:8px;justify-content:flex-start"><button class="btn primary ${okClass || ''}" data-ok="1">${esc(okLabel)}</button><button class="btn" data-cancel="1">ביטול</button></div>`);
+    const done = v => { document.removeEventListener('keydown', key, true); bg.remove(); resolve(v); };
+    const key = e => { if (e.key === 'Escape'){ e.stopImmediatePropagation(); done(false); } else if (e.key === 'Enter'){ e.preventDefault(); e.stopImmediatePropagation(); done(true); } };
+    document.addEventListener('keydown', key, true);
+    bg.addEventListener('mousedown', e => { if (e.target === bg) done(false); });
+    bg.addEventListener('click', e => { if (e.target.dataset.ok) done(true); if (e.target.dataset.cancel) done(false); });
+    bg.querySelector('[data-ok]').focus();
+  });
+}
 function colsPopover(anchor){
   const keys = ['__status','__subtype','__contact', ...FIELDS.map(f => f.key).filter(k => k !== NAME)];
   const p = popAt(anchor, `<h5>עמודות בטבלה</h5>${keys.map(k => `<label class="it"><input type="checkbox" data-c="${enc(k)}" ${S.ui.cols.includes(k) ? 'checked' : ''}>${esc(label(k))}</label>`).join('')}`);
@@ -901,9 +921,12 @@ function bulkEditPopover(anchor){
     $('#beL').innerHTML = optionsFor(f.key).map(o => `<option value="${esc(o)}">`).join('');
   };
   sync(); $('#beF').addEventListener('change', sync);
-  $('#beGo').addEventListener('click', () => {
+  $('#beGo').addEventListener('click', async () => {
     const f = editable[$('#beF').value], m = $('#beM').value, v = $('#beV').value.trim();
     if (f.type !== 'bool' && m !== 'clear' && !v) return;
+    const what = $('#beM').selectedOptions[0].textContent + (f.type === 'bool' || m === 'clear' ? '' : ` "${v}"`);
+    closePop();
+    if (SEL.size > 1 && !await confirmMany(SEL, `עדכון השדה "${f.label}": ${what}`, 'כן, לעדכן')) return;
     pushUndo(`עדכון "${f.label}" ל-${SEL.size} עסקים`);
     for (const id of SEL){
       const r = RIDX[id]; if (!r) continue; let nv;
@@ -1113,7 +1136,15 @@ $('#addBtn').addEventListener('click', () => {
 });
 $('#bulk').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  if (b.dataset.bulk) return setStatus(SEL, b.dataset.bulk);
+  if (b.dataset.bulk){
+    const st = b.dataset.bulk;
+    if (SEL.size > 1){
+      const title = st === 'clear' ? 'ניקוי הסטטוס' : `סימון כ"${S_LABEL[st]}"`;
+      confirmMany(SEL, title, st === 'clear' ? 'כן, לנקות' : `כן, לסמן כ"${S_LABEL[st]}"`).then(ok => ok && setStatus(SEL, st));
+      return;
+    }
+    return setStatus(SEL, st);
+  }
   if (b.id === 'bulkClear'){ SEL.clear(); renderAll(); }
   if (b.id === 'bulkEdit') bulkEditPopover(b);
   if (b.id === 'bulkExport') exportCSV([...SEL].map(id => RIDX[id]).filter(Boolean), 'עסקים-נבחרים');
