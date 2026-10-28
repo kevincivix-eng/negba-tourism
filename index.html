@@ -415,9 +415,15 @@ async function initSync(){
   setSync('loading');
   try {
     const rows = await pullAll();
+    // work done in this browser before it ever synced (the offline file version) is uploaded once
+    const onServer = new Set(rows.map(r => r.id));
+    const carry = S.ui.everSynced ? [] : [...new Set([...Object.keys(S.marks), ...Object.keys(S.edits), ...S.added.map(r => r._id), ...S.deleted])]
+      .filter(id => !onServer.has(id)).map(rowFor);
     // the server is the source of truth; local cache only covered the gap while loading
     Object.assign(S, {marks:{}, edits:{}, added:[], deleted:[]}); SYNCED = {};
     rows.forEach(applyRow);
+    carry.forEach(r => { applyRow(r); delete SYNCED[r.id]; });
+    S.ui.everSynced = true;
     loaded = true; rebuild(); renderAll(); if (CUR) renderDrawer(); setSync('ok');
     save();
   } catch(e){ setSync('error'); setTimeout(initSync, 15000); return; }
