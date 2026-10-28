@@ -267,7 +267,7 @@ td .tx{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
       <button class="btn sm sbtn yes" data-bulk="yes">✓ רלוונטי</button>
       <button class="btn sm sbtn maybe" data-bulk="maybe">? לבדיקה</button>
       <button class="btn sm sbtn no" data-bulk="no">✕ לא רלוונטי</button>
-      <button class="btn sm" data-bulk="clear">נקה סטטוס</button>
+      <button class="btn sm" data-bulk="clear">נקה התאמה</button>
       <button class="btn sm" id="bulkEdit">עריכת שדה ▾</button>
       <button class="btn sm" id="bulkExport">ייצוא הנבחרים</button>
       <div class="spacer"></div>
@@ -305,7 +305,7 @@ const NAME = 'שם העסק';
 const FIELDS = window.BASE_FIELDS;
 const FBY = Object.fromEntries(FIELDS.map(f => [f.key, f]));
 const VIRTUAL = {
-  __status:  {key:'__status',  label:'סטטוס',  type:'single', virtual:true},
+  __status:  {key:'__status',  label:'התאמה לפרויקט',  type:'single', virtual:true},
   __subtype: {key:'__subtype', label:'תת-סוג (אטרקציה / מטבח / לינה)', type:'multi', virtual:true},
   __contact: {key:'__contact', label:'פרטי קשר קיימים', type:'multi', virtual:true},
 };
@@ -581,10 +581,10 @@ function mark(ids, fn){
 }
 function setStatus(ids, s, quiet){
   ids = [...ids];
-  pushUndo(`סטטוס ל-${ids.length} עסקים`);
+  pushUndo(`התאמה לפרויקט ל-${ids.length} עסקים`);
   mark(ids, m => { if (s === 'clear') delete m.s; else m.s = s; });
   renderAll(); if (CUR) renderDrawer();
-  if (!quiet) toast(s === 'clear' ? `נוקה סטטוס ל-${ids.length} עסקים` : `${ids.length} עסקים סומנו "${S_LABEL[s]}"`);
+  if (!quiet) toast(s === 'clear' ? `נוקתה ההתאמה לפרויקט ל-${ids.length} עסקים` : `${ids.length} עסקים סומנו "${S_LABEL[s]}"`);
 }
 
 /* ---------------- editing ---------------- */
@@ -890,7 +890,7 @@ function confirmMany(ids, title, okLabel, okClass){
   return new Promise(resolve => {
     const bg = modal(`<h3>${esc(title)}</h3>
       <p style="margin:0 0 8px">הפעולה תחול על <b>${ids.length} עסקים</b> ותעודכן אצל כל המשתמשים.</p>
-      <p style="margin:0 0 8px;color:var(--muted);font-size:13px">הסטטוס שלהם כרגע: ${now}</p>
+      <p style="margin:0 0 8px;color:var(--muted);font-size:13px">ההתאמה לפרויקט כרגע: ${now}</p>
       <ul style="margin:0 0 14px;padding-inline-start:18px;color:var(--muted);font-size:13px">${names.map(n => `<li>${esc(n)}</li>`).join('')}${ids.length > names.length ? `<li>ועוד ${ids.length - names.length}…</li>` : ''}</ul>
       <div style="display:flex;gap:8px;justify-content:flex-start"><button class="btn primary ${okClass || ''}" data-ok="1">${esc(okLabel)}</button><button class="btn" data-cancel="1">ביטול</button></div>`);
     const done = v => { document.removeEventListener('keydown', key, true); bg.remove(); resolve(v); };
@@ -971,7 +971,7 @@ $('#restoreFile').addEventListener('change', async e => {
 /* ---------------- export ---------------- */
 const today = () => new Date().toISOString().slice(0, 10);
 function rowObj(r){
-  const o = {'סטטוס': status(r._id) === 'none' ? '' : S_LABEL[status(r._id)]};
+  const o = {'התאמה לפרויקט': status(r._id) === 'none' ? '' : S_LABEL[status(r._id)]};
   for (const f of FIELDS){ const v = r[f.key]; o[f.key] = Array.isArray(v) ? v.join(', ') : f.type === 'bool' ? (v ? 'כן' : '') : (v ?? ''); }
   return o;
 }
@@ -1077,7 +1077,7 @@ function renderGroups(list){
   let h = `<div class="dash"><div class="secth"><h2>רשימות לפי</h2><select id="gDim">${opts}</select>
     <span style="color:var(--muted)">${groups.length} קבוצות · ${list.length} עסקים בסינון הנוכחי</span>
     <span class="spacer"></span>${LEGEND}<button class="btn sm" id="gExport">⬇ ייצוא ל-Excel (גיליון לכל קבוצה)</button></div>
-    <p style="margin:0;color:var(--muted);font-size:13px">הרשימות מתעדכנות לפי המסננים בצד. עסק עם כמה ערכים (למשל לינה + קולינריה) יופיע בכל הקבוצות הרלוונטיות. טיפ: סננו "סטטוס = רלוונטי" כדי לראות רק את מה שנשאר.</p>
+    <p style="margin:0;color:var(--muted);font-size:13px">הרשימות מתעדכנות לפי המסננים בצד. עסק עם כמה ערכים (למשל לינה + קולינריה) יופיע בכל הקבוצות הרלוונטיות. טיפ: סננו "התאמה לפרויקט = רלוונטי" כדי לראות רק את מה שנשאר.</p>
     <div class="gcards">`;
   for (const [v, o] of groups){
     const recs = sortRec(o.ids), LIM = gOpen[v] ? 1e9 : 40;
@@ -1139,7 +1139,7 @@ $('#bulk').addEventListener('click', e => {
   if (b.dataset.bulk){
     const st = b.dataset.bulk;
     if (SEL.size > 1){
-      const title = st === 'clear' ? 'ניקוי הסטטוס' : `סימון כ"${S_LABEL[st]}"`;
+      const title = st === 'clear' ? 'ניקוי ההתאמה לפרויקט' : `סימון כ"${S_LABEL[st]}"`;
       confirmMany(SEL, title, st === 'clear' ? 'כן, לנקות' : `כן, לסמן כ"${S_LABEL[st]}"`).then(ok => ok && setStatus(SEL, st));
       return;
     }
